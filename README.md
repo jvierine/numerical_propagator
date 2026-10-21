@@ -13,6 +13,33 @@ epochs, and initial states. This is an independent implementation, not a GMAT
 script interpreter or a NASA-maintained product. Matching an integrator does
 not establish atmospheric-model or orbit-observation accuracy.
 
+## Model and uncertainty
+
+The equation of motion is
+
+$
+\dot{\mathbf r}=\mathbf v,\qquad
+\dot{\mathbf v}=\mathbf g(\mathbf r,t)
+-\frac{1}{2}\rho_{\mathrm{MSIS}}\,\beta_{\mathrm{eff}}(t)
+\lvert\mathbf v_{\mathrm{rel}}\rvert\mathbf v_{\mathrm{rel}},
+\qquad \beta_{\mathrm{eff}}=\gamma C_D A/m.
+$
+
+Gravity includes EGM2008 to degree and order 180, the Sun and Moon in the
+validated re-entry configuration. The gravity degree and order are configurable.
+MSIS2.1 uses the observed solar and geomagnetic drivers; the atmosphere
+co-rotates with Earth. The relative velocity is measured against this
+co-rotating atmosphere.
+
+Here, \(C_D\) is the drag coefficient, \(A/m\) is the area-to-mass ratio,
+and \(\gamma\) scales the neutral density. The fitted effective coefficient
+\(\beta_{\mathrm{eff}}\) combines these terms, so density error absorbed in it
+must not be applied again through an independent density correction. The core
+propagates supplied states and force parameters; estimating them and their
+uncertainty requires an external fit and sampling procedure. The caller supplies
+the gravity coefficients, ephemerides, Earth orientation, weather records, and
+MSIS callback as described below.
+
 ## Build and run
 
 Only the Rust toolchain is required. The core has no external crate dependencies.
