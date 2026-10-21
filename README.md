@@ -17,13 +17,13 @@ not establish atmospheric-model or orbit-observation accuracy.
 
 The equation of motion is
 
-$
+$$
 \dot{\mathbf r}=\mathbf v,\qquad
 \dot{\mathbf v}=\mathbf g(\mathbf r,t)
 -\frac{1}{2}\rho_{\mathrm{MSIS}}\,\beta_{\mathrm{eff}}(t)
 \lvert\mathbf v_{\mathrm{rel}}\rvert\mathbf v_{\mathrm{rel}},
 \qquad \beta_{\mathrm{eff}}=\gamma C_D A/m.
-$
+$$
 
 Gravity includes EGM2008 to degree and order 180, the Sun and Moon in the
 validated re-entry configuration. The gravity degree and order are configurable.
