@@ -31,9 +31,9 @@ MSIS2.1 uses the observed solar and geomagnetic drivers; the atmosphere
 co-rotates with Earth. The relative velocity is measured against this
 co-rotating atmosphere.
 
-Here, \(C_D\) is the drag coefficient, \(A/m\) is the area-to-mass ratio,
-and \(\gamma\) scales the neutral density. The fitted effective coefficient
-\(\beta_{\mathrm{eff}}\) combines these terms, so density error absorbed in it
+Here, $C_D$ is the drag coefficient, $A/m$ is the area-to-mass ratio,
+and $\gamma$ scales the neutral density. The fitted effective coefficient
+$\beta_{\mathrm{eff}}$ combines these terms, so density error absorbed in it
 must not be applied again through an independent density correction. The core
 propagates supplied states and force parameters; estimating them and their
 uncertainty requires an external fit and sampling procedure. The caller supplies
