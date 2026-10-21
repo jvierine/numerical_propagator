@@ -2,7 +2,7 @@
 name = "numerical_propagator"
 version = "0.1.0"
 edition = "2021"
-description = "NASA GMAT compatible propagator written in Rust"
+description = "NASA GMAT compatible propagator written in Rust, supporting gravity harmonics and atmospheric drag"
 repository = "https://github.com/jvierine/numerical_propagator"
 readme = "README.md"
 publish = false

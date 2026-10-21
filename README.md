@@ -1,6 +1,6 @@
 # numerical_propagator
 
-NASA GMAT compatible propagator written in Rust.
+NASA GMAT compatible propagator written in Rust, supporting gravity harmonics and atmospheric drag.
 
 A standalone numerical orbit propagator with adaptive DOP853 integration,
 fully normalized spherical-harmonic Earth gravity (including EGM2008),
