@@ -42,7 +42,8 @@ MSIS callback as described below.
 
 ## Build and run
 
-Only the Rust toolchain is required. The core has no external crate dependencies.
+Only the Rust toolchain is required. The default build uses the native Rust rmsis interface for MSIS2.1.
+A gravity/callback-only build is available with `--no-default-features`.
 
 ```sh
 git clone https://github.com/jvierine/numerical_propagator.git
@@ -110,21 +111,32 @@ return codes are not a replacement for meeting the buffer contracts.
 
 ## MSIS connection
 
-The core accepts a callback rather than linking a specific MSIS distribution.
-For a native Rust adapter, set `drag=1`, construct the context with
-`msis_address=0`, and install `Context::set_density_callback` before propagation.
-For example, an adapter can call [rmsis](https://github.com/jvierine/rmsis).
+Atmospheric drag uses [rmsis](https://github.com/jvierine/rmsis) through its
+MSIS2.1 interface, in double precision. No Python, pymsis, or SciPy runtime
+is loaded. The separately installed original NRLMSIS2.1 adapter and parameter
+file are required for this model; the rmsis interface serializes its calls.
 
-The double-precision callback arguments are day of year, UTC seconds of day,
-longitude (degrees east), latitude (degrees), geodetic height **in kilometres**,
-F10.7, mean F10.7, and seven Ap values. Return mass density in kg/m^3.
+Set `drag=1`, then call the Rust `Context::load_msis21(library, parameters)`
+or C `engine_load_msis21` before propagation. The library must be a trusted
+rmsis adapter; the parameter file is the original `msis21.parm`. Both paths
+are supplied explicitly, with no Python-package discovery. Loading is unsafe
+because it opens a native shared library. Loading failure returns an error.
 
-The legacy `msis_address` accepts the single-precision, pointer-based pymsis
-wrapper ABI used by the original application. It is a live function address,
-not a model identifier or path. Keep the loaded library alive. Serialize calls
-if the linked Fortran implementation uses shared global state. The callback
-must initialize/configure its model, units, switches, and weather convention
-consistently with the comparison run.
+`Context::set_density_callback` also permits a custom double-precision density
+model. Its arguments are day of year, UTC seconds of day, longitude (degrees
+east), latitude (degrees), height in kilometres, F10.7, mean F10.7, and seven
+Ap values. Return density in kg/m^3.
+
+Version 0.2 removes the legacy single-precision callback-address field from
+`Inputs`. Recompile C clients using the updated header; the old ABI is not
+compatible.
+
+## Plotting
+
+Scientific plots use [Rustplotlib](https://github.com/jvierine/rustplotlib),
+separately from the force/integration library. No Matplotlib plotting or SciPy
+integration is used. The core returns trajectory samples for Rustplotlib
+or other downstream applications.
 
 ## Propagation and output
 
@@ -167,7 +179,7 @@ interpolation; it does not reproduce the archived GMAT experiment.
 ## Third-party notices
 
 The DOP853 coefficient table is derived from SciPy and retains its BSD notice
-in `SCIPY_LICENSE.txt`. `PYMSIS_LICENSE.txt` retains the notice associated with
-the legacy callback integration. MSIS itself and gravity/ephemeris datasets
+in `SCIPY_LICENSE.txt`; this is attribution for the numerical constants, not
+a SciPy package dependency. MSIS itself and gravity/ephemeris datasets
 are separate dependencies with their own terms. No project-wide license has
 been selected for the remaining source.

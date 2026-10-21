@@ -45,7 +45,6 @@ typedef struct Inputs {
     double beta;
     int32_t drag;
     int32_t third_bodies;
-    size_t msis_address;
 } Inputs;
 typedef struct Stats {
     size_t nout, nfev, accepted, rejected;
@@ -53,6 +52,8 @@ typedef struct Stats {
 } Stats;
 Context *engine_new(const Inputs *input);
 void engine_free(Context *ctx);
+/* Available in default builds (feature msis21). */
+int32_t engine_load_msis21(Context *ctx, const char *library, const char *parameters);
 void engine_beta(Context *ctx, double beta);
 int32_t engine_gravity(Context *ctx, const double *position, double *output);
 int32_t engine_rhs(Context *ctx, double time, const double *state, size_t n, double *output);

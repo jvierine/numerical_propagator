@@ -128,18 +128,6 @@ mod log_drag_spline_tests {
 }
 const DAY: f64 = 86400.;
 const OMEGA: f64 = 7.292115e-5;
-type Msis = unsafe extern "C" fn(
-    *const f32,
-    *const f32,
-    *const f32,
-    *const f32,
-    *const f32,
-    *const f32,
-    *const f32,
-    *const f32,
-    *mut f32,
-    *const i32,
-);
 type Msis64 = fn(f64, f64, f64, f64, f64, f64, f64, [f64; 7]) -> f64;
 
 #[repr(C)]
@@ -181,7 +169,6 @@ pub struct Inputs {
     pub beta: f64,
     pub drag: i32,
     pub third_bodies: i32,
-    pub msis_address: usize,
 }
 
 #[repr(C)]
@@ -417,10 +404,65 @@ pub struct Context {
     ballistic_terminal_control: Option<(f64, f64, f64)>,
     smooth_density_correction: bool,
     third_bodies: bool,
-    msis: Option<Msis>,
+    #[cfg(feature = "msis21")]
+    msis21: Option<rmsis::msis21::Model>,
     nfev: usize,
 }
 impl Context {
+    /// Load the native rmsis MSIS2.1 adapter and original parameter file.
+    ///
+    /// # Safety
+    /// The library must be trusted and implement the rmsis MSIS2.1 ABI.
+    #[cfg(feature = "msis21")]
+    pub unsafe fn load_msis21(
+        &mut self,
+        library: impl AsRef<std::path::Path>,
+        parameters: impl AsRef<std::path::Path>,
+    ) -> Result<(), String> {
+        self.msis21 = Some(rmsis::msis21::Model::load(library, parameters)?);
+        self.msis_f64 = None;
+        Ok(())
+    }
+    fn native_density(
+        &self,
+        day: f64,
+        ut: f64,
+        lon: f64,
+        lat: f64,
+        z: f64,
+        f: f64,
+        fa: f64,
+        ap: [f64; 7],
+    ) -> Result<f64, i32> {
+        #[cfg(feature = "msis21")]
+        {
+            let input = rmsis::msis21::Input {
+                day_of_year: day,
+                seconds_of_day: ut,
+                longitude_deg: lon,
+                latitude_deg: lat,
+                altitude_km: z,
+                f107: f,
+                f107_average: fa,
+                ap,
+                storm_time: true,
+            };
+            return self
+                .msis21
+                .as_ref()
+                .ok_or(-1)?
+                .evaluate(&input)
+                .map_err(|_| -3)?
+                .densities[0]
+                .ok_or(-3);
+        }
+        #[cfg(not(feature = "msis21"))]
+        {
+            let _ = (day, ut, lon, lat, z, f, fa, ap);
+            Err(-1)
+        }
+    }
+
     /// Install a double precision density callback. Arguments: day of year,
     /// UTC seconds of day, longitude/latitude (degrees), height (km), F10.7,
     /// mean F10.7, seven Ap values. Return density in kg/m^3.
@@ -507,11 +549,8 @@ impl Context {
             correction_clip: i.correction_clip,
             drag: i.drag != 0,
             third_bodies: i.third_bodies != 0,
-            msis: if i.msis_address != 0 {
-                Some(std::mem::transmute::<usize, Msis>(i.msis_address))
-            } else {
-                None
-            },
+            #[cfg(feature = "msis21")]
+            msis21: None,
             nfev: 0,
         }
     }
@@ -571,33 +610,16 @@ impl Context {
                     std::array::from_fn(|k| self.ap[7 * j + k]),
                 );
             } else {
-                let mut output = [0_f32; 11];
-                let day = self.doy[j] as f32;
-                // Match Python's datetime64[s] truncation and f2py float32 inputs.
-                let ut = t.trunc().rem_euclid(DAY) as f32;
-                let lon = lon as f32;
-                let lat = lat as f32;
-                // NRLMSIS is a whole-atmosphere model. Entry thresholds belong
-                // to the integrator, not to a thermospheric density clamp.
-                let z = alt.max(0.) as f32;
-                let f = self.f107[j] as f32;
-                let fa = self.f107a[j] as f32;
-                let ap: [f32; 7] = std::array::from_fn(|k| self.ap[7 * j + k] as f32);
-                unsafe {
-                    (self.msis.ok_or(-1)?)(
-                        &day,
-                        &ut,
-                        &lon,
-                        &lat,
-                        &z,
-                        &f,
-                        &fa,
-                        ap.as_ptr(),
-                        output.as_mut_ptr(),
-                        &1,
-                    );
-                }
-                rho = output[0] as f64;
+                rho = self.native_density(
+                    self.doy[j],
+                    t.rem_euclid(DAY),
+                    lon,
+                    lat,
+                    alt.max(0.),
+                    self.f107[j],
+                    self.f107a[j],
+                    std::array::from_fn(|k| self.ap[7 * j + k]),
+                )?;
             }
             if rho >= 9.9e-38 && rho < 1e-37 {
                 return Err(-3);
@@ -1039,8 +1061,7 @@ fn integrate_inner(
 ///
 /// # Safety
 /// `input` and every array pointer must be aligned, readable, and correctly sized
-/// (including non-null pointers for zero-length arrays). A nonzero MSIS address
-/// must point to a live function with the exact callback ABI. See README.md.
+/// (including non-null pointers for zero-length arrays). See README.md.
 #[no_mangle]
 pub unsafe extern "C" fn engine_new(input: *const Inputs) -> *mut Context {
     match catch_unwind(AssertUnwindSafe(|| {
@@ -1186,6 +1207,34 @@ pub unsafe extern "C" fn engine_propagate(
             slice::from_raw_parts_mut(out_y, (nsample + 1) * n),
             &mut *stats,
         )
+    })) {
+        Ok(Ok(())) => 0,
+        Ok(Err(e)) => e,
+        Err(_) => -9,
+    }
+}
+
+/// Attach native rmsis MSIS2.1 to a context. Returns zero on success.
+///
+/// # Safety
+/// Context must be live and exclusive; paths must be valid UTF-8 NUL-terminated
+/// strings. Library must be trusted and implement the rmsis adapter ABI.
+#[cfg(feature = "msis21")]
+#[no_mangle]
+pub unsafe extern "C" fn engine_load_msis21(
+    ctx: *mut Context,
+    library: *const std::ffi::c_char,
+    parameters: *const std::ffi::c_char,
+) -> i32 {
+    match catch_unwind(AssertUnwindSafe(|| {
+        if ctx.is_null() || library.is_null() || parameters.is_null() {
+            return Err(-1);
+        }
+        let lib = std::ffi::CStr::from_ptr(library).to_str().map_err(|_| -1)?;
+        let par = std::ffi::CStr::from_ptr(parameters)
+            .to_str()
+            .map_err(|_| -1)?;
+        (*ctx).load_msis21(lib, par).map_err(|_| -1)
     })) {
         Ok(Ok(())) => 0,
         Ok(Err(e)) => e,

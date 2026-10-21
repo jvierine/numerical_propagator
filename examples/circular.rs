@@ -1,7 +1,7 @@
 //! Analytic circular-orbit check with degree-zero gravity and no drag.
 use numerical_propagator::{engine_free, engine_new, engine_propagate, Inputs, Stats};
 
-fn run_case(direction: f64) -> (f64, f64) {
+fn run_case(direction: f64, drag: bool) -> (f64, f64) {
     let gm: f64 = 3.986004418e14;
     let radius: f64 = 7_000_000.;
     let period = std::f64::consts::TAU * (radius.powi(3) / gm).sqrt();
@@ -9,6 +9,7 @@ fn run_case(direction: f64) -> (f64, f64) {
     let frames: Vec<f64> = identity.into_iter().cycle().take(18).collect();
     let zeros = [0.; 7];
     let c = [1.];
+    let flux = [150.];
     let start = 1_700_000_000.;
     let input = Inputs {
         degree: 0,
@@ -32,8 +33,8 @@ fn run_case(direction: f64) -> (f64, f64) {
         weather_start: start - 2. * period,
         weather_step: 4. * period,
         nweather: 1,
-        f107: c.as_ptr(),
-        f107a: c.as_ptr(),
+        f107: flux.as_ptr(),
+        f107a: flux.as_ptr(),
         ap: zeros.as_ptr(),
         doy: c.as_ptr(),
         correction_start: 0.,
@@ -45,10 +46,9 @@ fn run_case(direction: f64) -> (f64, f64) {
         correction_height_origin: 0.,
         correction_height_scale: 1.,
         correction_clip: 0.,
-        beta: 0.,
-        drag: 0,
+        beta: 0.02,
+        drag: drag as i32,
         third_bodies: 0,
-        msis_address: 0,
     };
     let initial = [radius, 0., 0., 0., (gm / radius).sqrt(), 0.];
     let end = start + direction * period;
@@ -60,6 +60,28 @@ fn run_case(direction: f64) -> (f64, f64) {
     let code = unsafe {
         let ctx = engine_new(&input);
         assert!(!ctx.is_null());
+        if drag {
+            #[cfg(feature = "msis21")]
+            {
+                (*ctx)
+                    .load_msis21(
+                        std::env::var("RMSIS21_LIBRARY").unwrap(),
+                        std::env::var("RMSIS21_PARAMETERS").unwrap(),
+                    )
+                    .unwrap();
+                let mut env = [0.; 8];
+                assert_eq!(
+                    numerical_propagator::engine_environment(
+                        ctx,
+                        start,
+                        initial.as_ptr(),
+                        env.as_mut_ptr()
+                    ),
+                    0
+                );
+                assert!(env[3] > 0. && env[3] < 1e-9);
+            }
+        }
         let result = engine_propagate(
             ctx,
             start,
@@ -90,7 +112,7 @@ fn run_case(direction: f64) -> (f64, f64) {
     (distance(0..3), distance(3..6))
 }
 fn main() {
-    let (position, velocity) = run_case(1.);
+    let (position, velocity) = run_case(1., false);
     println!(
         "One orbital period: position error {position:.6} m, velocity error {velocity:.9} m/s"
     );
@@ -99,14 +121,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "msis21")]
+    #[test]
+    #[ignore = "requires RMSIS21_LIBRARY and RMSIS21_PARAMETERS"]
+    fn native_rmsis_drag_orbit() {
+        let (p, v) = run_case(1., true);
+        assert!(p.is_finite() && v.is_finite() && p > 0.01);
+    }
     #[test]
     fn analytic_orbit_forward() {
-        let (p, v) = run_case(1.);
+        let (p, v) = run_case(1., false);
         assert!(p < 0.01 && v < 1e-5, "{p} m, {v} m/s");
     }
     #[test]
     fn analytic_orbit_backward() {
-        let (p, v) = run_case(-1.);
+        let (p, v) = run_case(-1., false);
         assert!(p < 0.01 && v < 1e-5, "{p} m, {v} m/s");
     }
 }

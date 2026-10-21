@@ -8,4 +8,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fmt --all -- --check
       - run: cargo test --locked --all-targets
+      - run: cargo test --locked --no-default-features --all-targets
       - run: cargo run --locked --release --example circular

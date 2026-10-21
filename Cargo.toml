@@ -1,6 +1,6 @@
 [package]
 name = "numerical_propagator"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "NASA GMAT compatible propagator written in Rust, supporting gravity harmonics and atmospheric drag"
 repository = "https://github.com/jvierine/numerical_propagator"
@@ -13,3 +13,10 @@ crate-type = ["cdylib", "rlib"]
 [profile.release]
 lto = true
 codegen-units = 1
+
+[features]
+default = ["msis21"]
+msis21 = ["dep:rmsis"]
+
+[dependencies]
+rmsis = { git = "https://github.com/jvierine/rmsis", rev = "fc707387617885de749dcc516c306a74227cf1b5", features = ["msis21"], optional = true }
