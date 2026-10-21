@@ -1,0 +1,15 @@
+[package]
+name = "numerical_propagator"
+version = "0.1.0"
+edition = "2021"
+description = "NASA GMAT compatible propagator written in Rust"
+repository = "https://github.com/jvierine/numerical_propagator"
+readme = "README.md"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+lto = true
+codegen-units = 1

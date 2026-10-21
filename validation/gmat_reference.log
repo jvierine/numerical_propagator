@@ -1,0 +1,9 @@
+GMAT f1: 564 accepted samples, 0 duplicates; position RMS/max/end 0.008848/0.082684/0.082684m; velocity RMS/max/end 0.00012841/0.00156769/0.00156769m/s; parent max 0.001850m
+GMAT f2: 565 accepted samples, 0 duplicates; position RMS/max/end 0.010544/0.096365/0.096365m; velocity RMS/max/end 0.00016056/0.00177886/0.00177886m/s; parent max 0.001850m
+GMAT f1_tight: 1118 accepted samples, 0 duplicates; position RMS/max/end 0.001375/0.008151/0.006542m; velocity RMS/max/end 0.00000929/0.00012110/0.00012110m/s; parent max 0.002330m
+GMAT f1_matched: 562 accepted samples, 0 duplicates; position RMS/max/end 0.003671/0.034852/0.034852m; velocity RMS/max/end 0.00005163/0.00064255/0.00064255m/s; parent max 0.002514m
+PASS f1: max 0.08268m, 0.0015677m/s
+PASS f2: max 0.09636m, 0.0017789m/s
+PASS f1_tight: max 0.00815m, 0.0001211m/s
+PASS f1_matched: max 0.03485m, 0.0006425m/s
+PASS GMAT max10s/accuracy1e-10 vs max5s/1e-11: 0.093591m, 0.00625633m/s
